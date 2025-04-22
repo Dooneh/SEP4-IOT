@@ -1,12 +1,12 @@
 services:
   sep4-python-env:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     image: sep4-java-env
     container_name: iot-container
     volumes:
-      - ./:/dev
+      - ../:/dev
     working_dir: /dev
     command: bash
     stdin_open: true

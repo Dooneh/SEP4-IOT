@@ -11,7 +11,7 @@ WORKDIR /dev
 //RUN pip install --no-cache-dir -r requirements.txt
 
 #Kopier resten af projektet
-COPY .
+COPY ..
 
 #Åbner bash
 CMD ["bash"]
