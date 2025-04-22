@@ -1,5 +1,5 @@
 #Base Image
-FROM python:3.11
+FROM openjdk:21-alpine
 
 #Working directory i containeren
 WORKDIR /app
