@@ -2,7 +2,7 @@
 FROM openjdk:21-alpine
 
 #Working directory i containeren
-WORKDIR /dev
+WORKDIR /tmp
 
 #Kopier requirements
 //COPY requirements.txt /app/

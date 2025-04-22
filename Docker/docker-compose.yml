@@ -6,8 +6,8 @@ services:
     image: sep4-java-env
     container_name: iot-container
     volumes:
-      - ../:/dev
-    working_dir: /dev
+      - ../:/tmp
+    working_dir: /tmp
     command: bash
     stdin_open: true
     tty: true
