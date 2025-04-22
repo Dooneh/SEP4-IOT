@@ -2,13 +2,13 @@
 FROM openjdk:21-alpine
 
 #Working directory i containeren
-WORKDIR /app
+WORKDIR /dev
 
 #Kopier requirements
-COPY requirements.txt /app/
+//COPY requirements.txt /app/
 
 #installer python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+//RUN pip install --no-cache-dir -r requirements.txt
 
 #Kopier resten af projektet
 COPY . .
