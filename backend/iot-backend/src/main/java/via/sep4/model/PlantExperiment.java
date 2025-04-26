@@ -31,5 +31,5 @@ public class PlantExperiment {
     private LocalDate endDate;
 
     @OneToMany(mappedBy = "experiment", cascade = CascadeType.ALL)
-    private List<PlantMeasurements> temperatureReadings;
+    private List<PlantMeasurements> measurements;
 }
