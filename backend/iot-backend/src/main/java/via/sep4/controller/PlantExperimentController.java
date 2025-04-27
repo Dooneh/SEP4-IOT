@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import via.sep4.repository.PlantExperimentRepository;
 import via.sep4.repository.PlantMeasurementsRepository;
+import via.sep4.service.ExperimentConfigService;
 import via.sep4.exceptions.ResourceNotFoundException;
 import via.sep4.model.PlantExperiment;
 import via.sep4.model.PlantMeasurements;
@@ -41,6 +42,9 @@ public class PlantExperimentController {
 
     @Autowired
     private PlantMeasurementsRepository measurementsRepository;
+
+    @Autowired
+    private ExperimentConfigService experimentConfigService;
 
     @GetMapping
     public ResponseEntity<List<PlantExperiment>> getAllExperiments() {
@@ -251,6 +255,43 @@ public class PlantExperimentController {
         experiment.setId(id);
         PlantExperiment updatedExperiment = experimentRepository.save(experiment);
         return ResponseEntity.ok(updatedExperiment);
+    }
+
+    @PutMapping("/{experimentId}/activate")
+    public ResponseEntity<?> activateExperiment(@PathVariable Long experimentId) {
+        if (experimentConfigService.setCurrentExperimentId(experimentId)) {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Experiment " + experimentId + " activated for sensor data collection",
+                    "experimentId", experimentId));
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of(
+                            "success", false,
+                            "message", "Experiment with ID " + experimentId + " not found"));
+        }
+    }
+
+    @GetMapping("/active")
+    public ResponseEntity<?> getActiveExperiment() {
+        Optional<PlantExperiment> experiment = experimentConfigService.getCurrentExperiment();
+
+        if (experiment.isPresent()) {
+            PlantExperiment activeExperiment = experiment.get();
+            return ResponseEntity.ok(Map.of(
+                    "experimentId", activeExperiment.getId(),
+                    "name", activeExperiment.getName(),
+                    "description", activeExperiment.getDescription(),
+                    "plantSpecies", activeExperiment.getPlantSpecies(),
+                    "startDate", activeExperiment.getStartDate(),
+                    "endDate", activeExperiment.getEndDate()));
+        } else {
+            Long currentId = experimentConfigService.getCurrentExperimentId();
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of(
+                            "message", "Active experiment with ID " + currentId + " not found",
+                            "experimentId", currentId));
+        }
     }
 
     @DeleteMapping("/{id}")
