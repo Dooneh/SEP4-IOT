@@ -1,18 +1,17 @@
-#Base Image
-FROM openjdk:21-alpine
+# Base Image
+FROM openjdk:21-jdk-slim
 
-#Working directory i containeren
-WORKDIR /tmp
+# Set the working directory in the container
+WORKDIR /app
 
-#Kopier requirements
-//COPY requirements.txt /app/
+# Copy the project files (use a specific folder if needed)
+COPY . /app/
 
-#installer python dependencies
-//RUN pip install --no-cache-dir -r requirements.txt
+# Rebuild the project 
+#RUN ./mvnw clean install -U
 
-#Kopier resten af projektet
-COPY ..
+# Expose the port for the application
+EXPOSE 8080
 
-#Åbner bash
-CMD ["bash"]
-
+# Run the JAR file (make sure the path is correct)
+CMD ["java", "-jar", "/app/target/iot-1.0-SNAPSHOT.jar"]

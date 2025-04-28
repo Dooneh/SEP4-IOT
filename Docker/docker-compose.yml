@@ -1,13 +1,16 @@
+version: '3.8'
+
 services:
-  sep4-python-env:
+  sep4-java-env:
     build:
-      context: ..
+      context: ../backend/iot-backend
       dockerfile: Dockerfile
     image: sep4-java-env
     container_name: iot-container
+    ports:
+      - "5040:8080"  # Access service at localhost 5040
+    working_dir: /app
     volumes:
-      - ../:/tmp
-    working_dir: /tmp
-    command: bash
+      - ../backend/iot-backend:/app
     stdin_open: true
     tty: true
