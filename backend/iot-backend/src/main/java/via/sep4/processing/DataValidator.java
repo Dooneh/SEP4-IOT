@@ -42,7 +42,7 @@ public class DataValidator {
             return ValidationResult.VALIDATION_ERROR_LUFT_TEMPERATUR;
         }
 
-        if (temperature < 15.0f || temperature > 40.0f) {
+        if (temperature < 10.0f || temperature > 50.0f) {
             return ValidationResult.VALIDATION_ERROR_LUFT_TEMPERATUR;
         }
 
