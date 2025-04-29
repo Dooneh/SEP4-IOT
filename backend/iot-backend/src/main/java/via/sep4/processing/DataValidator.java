@@ -11,7 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import jakarta.validation.ValidationException;
+import via.sep4.exceptions.ValidationException;
 
 @Component
 public class DataValidator {
@@ -36,6 +36,177 @@ public class DataValidator {
 
     private int errorRow = 0;
     private List<String> validationErrors = new ArrayList<>();
+
+    public ValidationResult validateTemperature(Float temperature) {
+        if (temperature == null) {
+            return ValidationResult.VALIDATION_ERROR_LUFT_TEMPERATUR;
+        }
+
+        if (temperature < 10.0f || temperature > 50.0f) {
+            return ValidationResult.VALIDATION_ERROR_LUFT_TEMPERATUR;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateHumidity(Integer humidity) {
+        if (humidity == null) {
+            return ValidationResult.VALIDATION_ERROR_LUFTFUGTIGHED;
+        }
+
+        if (humidity < 0 || humidity > 100) {
+            return ValidationResult.VALIDATION_ERROR_LUFTFUGTIGHED;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateSoilMoisture(Integer soilMoisture) {
+        if (soilMoisture == null) {
+            return ValidationResult.VALIDATION_ERROR_JORD_FUGTIGHED;
+        }
+
+        if (soilMoisture < 0 || soilMoisture > 100) {
+            return ValidationResult.VALIDATION_ERROR_JORD_FUGTIGHED;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateLightIntensity(Integer highestIntensity, Integer lowestIntensity) {
+        if (highestIntensity != null && highestIntensity <= 0) {
+            return ValidationResult.VALIDATION_ERROR_LYS_HØJESTE_INTENSITET;
+        }
+
+        if (lowestIntensity != null && lowestIntensity < 0) {
+            return ValidationResult.VALIDATION_ERROR_LYS_LAVESTE_INTENSITET;
+        }
+
+        if (highestIntensity != null && lowestIntensity != null && highestIntensity <= lowestIntensity) {
+            return ValidationResult.VALIDATION_ERROR_LYS_HØJESTE_INTENSITET;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateLightSetting(Integer lightSetting) {
+        if (lightSetting != null && (lightSetting < 0 || lightSetting > 10)) {
+            return ValidationResult.VALIDATION_ERROR_LYS_INDSTILLING;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateHeight(Integer height) {
+        if (height != null && height <= 0) {
+            return ValidationResult.VALIDATION_ERROR_AFSTAND_TIL_HØJDE;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateWaterTime(Integer time) {
+        if (time != null && time < 0) {
+            return ValidationResult.VALIDATION_ERROR_VAND_TID_FRA_SIDSTE;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateWaterAmount(Integer amount) {
+        if (amount != null && amount <= 0) {
+            return ValidationResult.VALIDATION_ERROR_VAND_MÆNGDE;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateWaterFrequency(Integer frequency) {
+        if (frequency != null && frequency <= 0) {
+            return ValidationResult.VALIDATION_ERROR_VAND_FREKVENS;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateTimestamp(String timestamp) {
+        if (timestamp == null || timestamp.isEmpty()) {
+            return ValidationResult.VALIDATION_SUCCESS;
+        }
+
+        if (!isValidTimestamp(timestamp)) {
+            return ValidationResult.VALIDATION_ERROR_TIDSSTEMPEL;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public void validateMeasurementData(Map<String, String> data) throws ValidationException {
+        List<String> errors = new ArrayList<>();
+
+        // required fields
+        ValidationResult tempResult = validateTemperature(parseFloat(data.get("Luft_temperatur")));
+        if (tempResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(tempResult));
+        }
+
+        ValidationResult humidityResult = validateHumidity(parseInt(data.get("Luftfugtighed")));
+        if (humidityResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(humidityResult));
+        }
+
+        ValidationResult soilResult = validateSoilMoisture(parseInt(data.get("Jord_fugtighed")));
+        if (soilResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(soilResult));
+        }
+
+        // optional fields
+        ValidationResult lightResult = validateLightIntensity(
+                parseInt(data.get("Lys_højeste_intensitet")),
+                parseInt(data.get("Lys_laveste_intensitet")));
+        if (lightResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(lightResult));
+        }
+
+        ValidationResult settingResult = validateLightSetting(parseInt(data.get("Lys_indstilling")));
+        if (settingResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(settingResult));
+        }
+
+        ValidationResult heightResult = validateHeight(parseInt(data.get("Afstand_til_Højde")));
+        if (heightResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(heightResult));
+        }
+
+        ValidationResult waterTimeResult = validateWaterTime(parseInt(data.get("Vand_tid_fra_sidste")));
+        if (waterTimeResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(waterTimeResult));
+        }
+
+        ValidationResult waterAmountResult = validateWaterAmount(parseInt(data.get("Vand_mængde")));
+        if (waterAmountResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(waterAmountResult));
+        }
+
+        ValidationResult waterFreqResult = validateWaterFrequency(parseInt(data.get("Vand_frekvens")));
+        if (waterFreqResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(waterFreqResult));
+        }
+
+        ValidationResult timestampResult = validateTimestamp(data.get("Tidsstempel"));
+        if (timestampResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(timestampResult));
+        }
+
+        // if we have any errors throw a validation exception
+        if (!errors.isEmpty()) {
+            StringBuilder errorMessage = new StringBuilder("Validation failed with the following errors:\n");
+            for (String error : errors) {
+                errorMessage.append("- ").append(error).append("\n");
+            }
+            throw new ValidationException(errorMessage.toString());
+        }
+    }
 
     public ValidationResult validate(DataConverter converter) {
         if (converter == null || converter.getData().isEmpty() || converter.getRows() <= 0
@@ -66,76 +237,82 @@ public class DataValidator {
             Map<String, String> rowData = converter.getData().get(row);
 
             Float tempValue = parseFloat(rowData.get(converter.getHeaders().get(luftTempIdx)));
-            if (tempValue == null || tempValue < 15.0f || tempValue > 40.0f) {
-                return ValidationResult.VALIDATION_ERROR_LUFT_TEMPERATUR;
+            ValidationResult tempResult = validateTemperature(tempValue);
+            if (tempResult != ValidationResult.VALIDATION_SUCCESS) {
+                return tempResult;
             }
 
             Integer luftfugtighedValue = parseInt(rowData.get(converter.getHeaders().get(luftfugtighedIdx)));
-            if (luftfugtighedValue == null || luftfugtighedValue < 0 || luftfugtighedValue > 100) {
-                return ValidationResult.VALIDATION_ERROR_LUFTFUGTIGHED;
+            ValidationResult humidityResult = validateHumidity(luftfugtighedValue);
+            if (humidityResult != ValidationResult.VALIDATION_SUCCESS) {
+                return humidityResult;
             }
 
             Integer jordFugtighedValue = parseInt(rowData.get(converter.getHeaders().get(jordFugtighedIdx)));
-            if (jordFugtighedValue == null || jordFugtighedValue < 0 || jordFugtighedValue > 100) {
-                return ValidationResult.VALIDATION_ERROR_JORD_FUGTIGHED;
+            ValidationResult soilResult = validateSoilMoisture(jordFugtighedValue);
+            if (soilResult != ValidationResult.VALIDATION_SUCCESS) {
+                return soilResult;
             }
 
             if (lysHøjesteIdx != -1) {
                 Integer lysHøjesteValue = parseInt(rowData.get(converter.getHeaders().get(lysHøjesteIdx)));
-                if (lysHøjesteValue == null || lysHøjesteValue <= 0) {
-                    return ValidationResult.VALIDATION_ERROR_LYS_HØJESTE_INTENSITET;
-                }
+                Integer lysLavesteValue = null;
 
                 if (lysLavesteIdx != -1) {
-                    Integer lysLavesteValue = parseInt(rowData.get(converter.getHeaders().get(lysLavesteIdx)));
-                    if (lysLavesteValue == null || lysLavesteValue < 0) {
-                        return ValidationResult.VALIDATION_ERROR_LYS_LAVESTE_INTENSITET;
-                    }
+                    lysLavesteValue = parseInt(rowData.get(converter.getHeaders().get(lysLavesteIdx)));
+                }
 
-                    if (lysHøjesteValue <= lysLavesteValue) {
-                        return ValidationResult.VALIDATION_ERROR_LYS_HØJESTE_INTENSITET;
-                    }
+                ValidationResult lightResult = validateLightIntensity(lysHøjesteValue, lysLavesteValue);
+                if (lightResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return lightResult;
                 }
             }
 
             if (lysIndstillingIdx != -1) {
                 Integer lysIndstillingValue = parseInt(rowData.get(converter.getHeaders().get(lysIndstillingIdx)));
-                if (lysIndstillingValue == null || lysIndstillingValue < 0 || lysIndstillingValue > 10) {
-                    return ValidationResult.VALIDATION_ERROR_LYS_INDSTILLING;
+                ValidationResult settingResult = validateLightSetting(lysIndstillingValue);
+                if (settingResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return settingResult;
                 }
             }
 
             if (afstandTilHøjdeIdx != -1) {
                 Integer afstandValue = parseInt(rowData.get(converter.getHeaders().get(afstandTilHøjdeIdx)));
-                if (afstandValue == null || afstandValue <= 0) {
-                    return ValidationResult.VALIDATION_ERROR_AFSTAND_TIL_HØJDE;
+                ValidationResult heightResult = validateHeight(afstandValue);
+                if (heightResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return heightResult;
                 }
             }
 
             if (vandTidFraSidsteIdx != -1) {
                 Integer vandTidValue = parseInt(rowData.get(converter.getHeaders().get(vandTidFraSidsteIdx)));
-                if (vandTidValue == null || vandTidValue < 0) {
-                    return ValidationResult.VALIDATION_ERROR_VAND_TID_FRA_SIDSTE;
+                ValidationResult waterTimeResult = validateWaterTime(vandTidValue);
+                if (waterTimeResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return waterTimeResult;
                 }
             }
 
             if (vandMængdeIdx != -1) {
                 Integer vandMængdeValue = parseInt(rowData.get(converter.getHeaders().get(vandMængdeIdx)));
-                if (vandMængdeValue == null || vandMængdeValue <= 0) {
-                    return ValidationResult.VALIDATION_ERROR_VAND_MÆNGDE;
+                ValidationResult waterAmountResult = validateWaterAmount(vandMængdeValue);
+                if (waterAmountResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return waterAmountResult;
                 }
             }
 
             if (vandFrekvensIdx != -1) {
                 Integer vandFrekvensValue = parseInt(rowData.get(converter.getHeaders().get(vandFrekvensIdx)));
-                if (vandFrekvensValue == null || vandFrekvensValue <= 0) {
-                    return ValidationResult.VALIDATION_ERROR_VAND_FREKVENS;
+                ValidationResult waterFreqResult = validateWaterFrequency(vandFrekvensValue);
+                if (waterFreqResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return waterFreqResult;
                 }
             }
 
             if (tidsstempelIdx != -1) {
-                if (!isValidTimestamp(rowData.get(converter.getHeaders().get(tidsstempelIdx)))) {
-                    return ValidationResult.VALIDATION_ERROR_TIDSSTEMPEL;
+                String timestampValue = rowData.get(converter.getHeaders().get(tidsstempelIdx));
+                ValidationResult timestampResult = validateTimestamp(timestampValue);
+                if (timestampResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return timestampResult;
                 }
             }
         }
@@ -295,7 +472,6 @@ public class DataValidator {
                 String lysIndstillingStr = rowData.get(converter.getHeaders().get(lysIndstillingIdx));
                 Integer lysIndstillingValue = parseInt(lysIndstillingStr);
                 if (lysIndstillingStr != null && !lysIndstillingStr.isEmpty() && lysIndstillingValue != null) {
-                    // If it's a number, validate it
                     if (lysIndstillingValue < 0 || lysIndstillingValue > 10) {
                         validationErrors.add(String.format("Row %d: Light setting must be between 0 and 10 (got: %s)",
                                 row + 1, lysIndstillingValue));
