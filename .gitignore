@@ -2,8 +2,18 @@
 .vscode/
 .idea/
 
+# Ignore application.properties in the backend directory
+backend/iot-backend/src/main/resources/application.properties
+
 # OS
 .DS_Store
+
+# Log files
+*.log
+
+# Build directories
+build/
+dist/
 
 # Java build
 target/
