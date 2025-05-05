@@ -20,7 +20,7 @@ jobs:
         cache: maven
 
     - name: Build and test with Maven
-      run: mvn clean verify --file backend/pom.xml
+      run: mvn clean verify --file backend/iot-backend/pom.xml
 
     - name: Log in to Docker Hub
       uses: docker/login-action@v3
