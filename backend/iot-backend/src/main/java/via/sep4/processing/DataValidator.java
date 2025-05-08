@@ -30,6 +30,7 @@ public class DataValidator {
         VALIDATION_ERROR_VAND_TID_FRA_SIDSTE,
         VALIDATION_ERROR_VAND_MÆNGDE,
         VALIDATION_ERROR_VAND_FREKVENS,
+        VALIDATION_ERROR_MOTION_SENSOR,
         VALIDATION_ERROR_TIDSSTEMPEL,
         VALIDATION_ERROR_GENERAL
     }
@@ -141,6 +142,18 @@ public class DataValidator {
         return ValidationResult.VALIDATION_SUCCESS;
     }
 
+    public ValidationResult validateMotionSensor(String motionSensor) {
+        if (motionSensor == null || motionSensor.isEmpty()) {
+            return ValidationResult.VALIDATION_ERROR_MOTION_SENSOR;
+        }
+
+        if (!motionSensor.equals("Yes") && !motionSensor.equals("No")) {
+            return ValidationResult.VALIDATION_ERROR_MOTION_SENSOR;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
     public void validateMeasurementData(Map<String, String> data) throws ValidationException {
         List<String> errors = new ArrayList<>();
 
@@ -193,6 +206,11 @@ public class DataValidator {
             errors.add(getErrorMessage(waterFreqResult));
         }
 
+        ValidationResult motionSensorResult = validateMotionSensor(data.get("Motion_sensor"));
+        if (motionSensorResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(motionSensorResult));
+        }
+
         ValidationResult timestampResult = validateTimestamp(data.get("Tidsstempel"));
         if (timestampResult != ValidationResult.VALIDATION_SUCCESS) {
             errors.add(getErrorMessage(timestampResult));
@@ -226,6 +244,7 @@ public class DataValidator {
         int vandTidFraSidsteIdx = findColumnIndex(converter, "Vand_tid_fra_sidste");
         int vandMængdeIdx = findColumnIndex(converter, "Vand_mængde");
         int vandFrekvensIdx = findColumnIndex(converter, "Vand_frekvens");
+        int motionSensorIdx = findColumnIndex(converter, "Motion_sensor");
         int tidsstempelIdx = findColumnIndex(converter, "Tidsstempel");
 
         if (luftTempIdx == -1 || luftfugtighedIdx == -1 || jordFugtighedIdx == -1) {
@@ -308,6 +327,14 @@ public class DataValidator {
                 }
             }
 
+            if (motionSensorIdx != -1) {
+                String motionSensorValue = rowData.get(converter.getHeaders().get(motionSensorIdx));
+                ValidationResult motionSensorResult = validateMotionSensor(motionSensorValue);
+                if (motionSensorResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return motionSensorResult;
+                }
+            }
+
             if (tidsstempelIdx != -1) {
                 String timestampValue = rowData.get(converter.getHeaders().get(tidsstempelIdx));
                 ValidationResult timestampResult = validateTimestamp(timestampValue);
@@ -361,6 +388,10 @@ public class DataValidator {
             case VALIDATION_ERROR_VAND_FREKVENS:
                 return String.format("Validation failed: Vand_frekvens must be a positive integer at row %d",
                         errorRow + 1);
+            case VALIDATION_ERROR_MOTION_SENSOR:
+                return String.format(
+                        "Validation failed: Motion_sensor must be a non-empty string at row %d containing either 'Yes' or 'No'",
+                        errorRow + 1);
             case VALIDATION_ERROR_TIDSSTEMPEL:
                 return String.format("Validation failed: Tidsstempel must be in YYYY-MM-DDThh:mm:ss format at row %d",
                         errorRow + 1);
@@ -392,6 +423,7 @@ public class DataValidator {
         int vandTidFraSidsteIdx = findColumnIndex(converter, "Vand_tid_fra_sidste");
         int vandMængdeIdx = findColumnIndex(converter, "Vand_mængde");
         int vandFrekvensIdx = findColumnIndex(converter, "Vand_frekvens");
+        int motionSensorIdx = findColumnIndex(converter, "Motion_sensor");
         int tidsstempelIdx = findColumnIndex(converter, "Tidsstempel");
 
         if (luftTempIdx == -1) {
@@ -521,6 +553,16 @@ public class DataValidator {
                 } else if (vandFrekvensValue <= 0) {
                     validationErrors.add(String.format("Row %d: Water frequency must be a positive number (got: %s)",
                             row + 1, vandFrekvensValue));
+                }
+            }
+
+            if (motionSensorIdx != -1) {
+                String motionSensorValue = rowData.get(converter.getHeaders().get(motionSensorIdx));
+                if (motionSensorValue == null || motionSensorValue.isEmpty()) {
+                    validationErrors.add(String.format("Row %d: Motion sensor value is missing or empty", row + 1));
+                } else if (!motionSensorValue.equalsIgnoreCase("Yes") && !motionSensorValue.equalsIgnoreCase("No")) {
+                    validationErrors.add(String.format(
+                            "Row %d: Motion sensor value must be 'Yes' or 'No' (got: %s)", row + 1, motionSensorValue));
                 }
             }
 
