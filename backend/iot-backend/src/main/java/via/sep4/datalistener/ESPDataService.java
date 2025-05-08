@@ -36,7 +36,8 @@ public class ESPDataService {
     @Autowired
     private ExperimentConfigService experimentConfigService;
 
-    private final Pattern pattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
+    private final Pattern numericPattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
+    private final Pattern motionPattern = Pattern.compile("Motion: (\\w+)");
 
     public void processData(String data) {
         logger.info("Processing data: {}", data);
@@ -69,6 +70,7 @@ public class ESPDataService {
         processHumidity(extractedData.get("Humidity"), measurement, experimentId, data);
         processSoilMoisture(extractedData.get("Soil"), measurement, experimentId, data);
         processDistance(extractedData.get("Distance"), measurement, experimentId, data);
+        processMotion(extractedData.get("Motion"), measurement, experimentId, data);
 
         if (hasMeasurements(measurement)) {
             measurementsRepository.save(measurement);
@@ -80,13 +82,19 @@ public class ESPDataService {
 
     private Map<String, String> extractMeasurements(String data) {
         Map<String, String> extractedData = new HashMap<>();
-        Matcher matcher = pattern.matcher(data);
-
-        while (matcher.find()) {
-            String label = matcher.group(1);
-            String value = matcher.group(2);
+        Matcher numericMatcher = numericPattern.matcher(data);
+        while (numericMatcher.find()) {
+            String label = numericMatcher.group(1);
+            String value = numericMatcher.group(2);
             extractedData.put(label, value);
             logger.debug("Extracted {}: {}", label, value);
+        }
+
+        Matcher motionMatcher = motionPattern.matcher(data);
+        if (motionMatcher.find()) {
+            String motionValue = motionMatcher.group(1);
+            extractedData.put("Motion", motionValue);
+            logger.debug("Extracted Motion: {}", motionValue);
         }
 
         return extractedData;
@@ -103,6 +111,7 @@ public class ESPDataService {
         measurement.setVandTidFraSidste(0);
         measurement.setVandMængde(0);
         measurement.setVandFrekvens(0);
+        measurement.setMotionSensor("No");
     }
 
     private boolean hasMeasurements(PlantMeasurements measurement) {
@@ -230,6 +239,36 @@ public class ESPDataService {
             storeInvalidMeasurement(experimentId,
                     "Distance: " + distanceValue,
                     "Invalid distance format");
+        }
+    }
+
+    private void processMotion(String motionValue, PlantMeasurements measurement, Long experimentId,
+            String rawData) {
+        if (motionValue == null) {
+            logger.debug("No motion value found");
+            return;
+        }
+
+        try {
+            String motion = motionValue.trim();
+            ValidationResult result = dataValidator.validateMotionSensor(motion);
+
+            if (result == ValidationResult.VALIDATION_SUCCESS) {
+                measurement.setMotionSensor(motion);
+                logger.debug("Valid motion: {}", motion);
+            } else {
+                String errorMessage = "Motion validation failed: " + dataValidator.getErrorMessage(result);
+                logger.warn(errorMessage);
+
+                storeInvalidMeasurement(experimentId,
+                        "Motion: " + motionValue,
+                        errorMessage);
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid motion format: {}", motionValue);
+            storeInvalidMeasurement(experimentId,
+                    "Motion: " + motionValue,
+                    "Invalid motion format");
         }
     }
 
