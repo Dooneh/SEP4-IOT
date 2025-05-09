@@ -243,4 +243,95 @@ public class ESPDataService {
         invalidMeasurementRepository.save(invalidMeasurement);
         logger.info("Stored invalid measurement: {}", errorMessage);
     }
+
+    public void processData(String data) {
+        logger.info("Processing data: {}", data);
+
+        // Check if the data contains pump commands
+        Matcher pumpMatcher = pumpPattern.matcher(data);
+        if (pumpMatcher.find()) {
+            String pumpCommand = pumpMatcher.group(1);
+            processPumpCommand(pumpCommand);
+            return; // Process only pump command and return
+        }
+
+
+
+/**
+ * Process pump commands and manage watering events
+ *
+ * @param command ON or OFF command for the pump
+ */
+        private void processPumpCommand (String command){
+            logger.info("Processing pump command: {}", command);
+
+            Long experimentId = experimentConfigService.getCurrentExperimentId();
+            Optional<PlantExperiment> experimentOptional = experimentConfigService.getCurrentExperiment();
+
+            if (!experimentOptional.isPresent()) {
+                logger.error("No active experiment found with ID: {}", experimentId);
+                return;
+            }
+
+            PlantExperiment experiment = experimentOptional.get();
+
+            if ("ON".equals(command)) {
+                // Start the water pump
+                boolean success = waterPump.startWatering();
+
+                if (success) {
+                    // Record the watering event
+                    WateringEvent event = new WateringEvent();
+                    event.setExperiment(experiment);
+                    event.setStartTime(LocalDateTime.now());
+                    event.setEndTime(null); // Will be set when pump turns OFF
+
+                    // Calculate time since last watering if available
+                    if (lastWateringTime != null) {
+                        long minutesSinceLastWatering = ChronoUnit.MINUTES.between(lastWateringTime, LocalDateTime.now());
+                        event.setMinutesSinceLastWatering((int) minutesSinceLastWatering);
+                    }
+
+                    // Save the watering event
+                    WateringEvent savedEvent = wateringEventRepository.save(event);
+                    logger.info("Recorded watering start event with ID: {}", savedEvent.getId());
+                } else {
+                    logger.error("Failed to start water pump");
+                }
+            } else if ("OFF".equals(command)) {
+                // Stop the water pump
+                boolean success = waterPump.stopWatering();
+
+                if (success) {
+                    // Find the latest watering event without an end time
+                    List<WateringEvent> incompleteEvents = wateringEventRepository.findByExperimentIdAndEndTimeIsNull(experiment.getId());
+
+                    if (!incompleteEvents.isEmpty()) {
+                        // Update the most recent event with an end time
+                        WateringEvent latestEvent = incompleteEvents.get(0);
+                        latestEvent.setEndTime(LocalDateTime.now());
+
+                        // Calculate duration in seconds
+                        long durationSeconds = ChronoUnit.SECONDS.between(latestEvent.getStartTime(), latestEvent.getEndTime());
+                        latestEvent.setDurationSeconds((int) durationSeconds);
+
+                        // Update the event
+                        wateringEventRepository.save(latestEvent);
+                        logger.info("Updated watering event {} with end time and duration: {} seconds",
+                                latestEvent.getId(), durationSeconds);
+
+                        // Update the lastWateringTime for future reference
+                        lastWateringTime = LocalDateTime.now();
+                    } else {
+                        logger.warn("Received PUMP OFF command but no active watering event was found");
+                    }
+                } else {
+                    logger.error("Failed to stop water pump");
+                }
+            }
+        }
+
+
+    }
+}
 }
