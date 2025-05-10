@@ -14,6 +14,9 @@ import via.sep4.processing.DataValidator.ValidationResult;
 import via.sep4.repository.InvalidMeasurementRepository;
 import via.sep4.repository.PlantMeasurementsRepository;
 import via.sep4.service.ExperimentConfigService;
+import via.sep4.model.WateringEvent;
+import via.sep4.repository.WateringEventRepository;
+
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -37,13 +40,30 @@ public class ESPDataService {
     @Autowired
     private ExperimentConfigService experimentConfigService;
 
+    @Autowired
+    private WateringEventRepository wateringEventRepository;
+
+    @Autowired
+    private WaterPump waterPump;
+
+    private LocalDateTime lastWateringTime;
+
+
     Pattern pumpPattern = Pattern.compile("Pump: (ON|OFF)");
 
     private final Pattern pattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
-    private LogManager wateringEventRepository;
+
 
     public void processData(String data) {
         logger.info("Processing data: {}", data);
+
+        // Check if the data contains pump commands
+        Matcher pumpMatcher = pumpPattern.matcher(data);
+        if (pumpMatcher.find()) {
+            String pumpCommand = pumpMatcher.group(1);
+            processPumpCommand(pumpCommand);
+            return; // Process only pump command and return
+        }
 
         Map<String, String> extractedData = extractMeasurements(data);
         if (extractedData.isEmpty()) {
@@ -248,16 +268,6 @@ public class ESPDataService {
         logger.info("Stored invalid measurement: {}", errorMessage);
     }
 
-    public void processData(String data) {
-        logger.info("Processing data: {}", data);
-
-        // Check if the data contains pump commands
-        Matcher pumpMatcher = pumpPattern.matcher(data);
-        if (pumpMatcher.find()) {
-            String pumpCommand = pumpMatcher.group(1);
-            processPumpCommand(pumpCommand);
-            return; // Process only pump command and return
-        }
 
 
 
