@@ -1,5 +1,6 @@
 package via.sep4.datalistener;
 
+import org.antlr.v4.runtime.misc.LogManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,7 +37,10 @@ public class ESPDataService {
     @Autowired
     private ExperimentConfigService experimentConfigService;
 
+    Pattern pumpPattern = Pattern.compile("Pump: (ON|OFF)");
+
     private final Pattern pattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
+    private LogManager wateringEventRepository;
 
     public void processData(String data) {
         logger.info("Processing data: {}", data);
@@ -334,4 +338,4 @@ public class ESPDataService {
 
     }
 }
-}
+
