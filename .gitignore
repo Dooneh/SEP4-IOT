@@ -1,0 +1,19 @@
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Log files
+*.log
+
+# Build directories
+build/
+dist/
+
+# Java build
+target/
+
+# Credentials
+.env
