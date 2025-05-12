@@ -37,6 +37,7 @@ public class ESPDataService {
     private ExperimentConfigService experimentConfigService;
 
     private final Pattern pattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
+    private final Pattern lightPattern = Pattern.compile("Light: (\\d+)% \\(raw: (\\d+)\\)");
 
     public void processData(String data) {
         logger.info("Processing data: {}", data);
@@ -69,6 +70,8 @@ public class ESPDataService {
         processHumidity(extractedData.get("Humidity"), measurement, experimentId, data);
         processSoilMoisture(extractedData.get("Soil"), measurement, experimentId, data);
         processDistance(extractedData.get("Distance"), measurement, experimentId, data);
+        processLight(extractedData.get("Light"), measurement, experimentId, data);
+        processLightRaw(extractedData.get("LightRaw"), measurement, experimentId, data);
 
         if (hasMeasurements(measurement)) {
             measurementsRepository.save(measurement);
@@ -87,6 +90,15 @@ public class ESPDataService {
             String value = matcher.group(2);
             extractedData.put(label, value);
             logger.debug("Extracted {}: {}", label, value);
+        }
+
+        Matcher lightMatcher = lightPattern.matcher(data);
+        if (lightMatcher.find()) {
+            String lightPercentage = lightMatcher.group(1);
+            String lightRaw = lightMatcher.group(2);
+            extractedData.put("Light", lightPercentage);
+            extractedData.put("LightRaw", lightRaw);
+            logger.debug("Extracted Light: {}%, LightRaw: {}", lightPercentage, lightRaw);
         }
 
         return extractedData;
@@ -230,6 +242,64 @@ public class ESPDataService {
             storeInvalidMeasurement(experimentId,
                     "Distance: " + distanceValue,
                     "Invalid distance format");
+        }
+    }
+
+    private void processLight(String lightValue, PlantMeasurements measurement, Long experimentId,
+            String rawData) {
+        if (lightValue == null) {
+            logger.debug("No light value found");
+            return;
+        }
+
+        try {
+            double lightPercentage = Double.parseDouble(lightValue);
+
+            ValidationResult validationResult = dataValidator.validateLightAmount(lightPercentage);
+            if (validationResult != ValidationResult.VALIDATION_SUCCESS) {
+                logger.warn("Light validation failed: {}", validationResult);
+                storeInvalidMeasurement(experimentId, "Light: " + lightValue,
+                        "Light validation failed: " + validationResult);
+                return;
+            }
+
+            measurement.setLysMængde(lightPercentage);
+
+            logger.debug("Processed light value: {}%", lightPercentage);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid light format: {}", lightValue);
+            storeInvalidMeasurement(experimentId,
+                    "Light: " + lightValue,
+                    "Invalid light format");
+        }
+    }
+
+    private void processLightRaw(String lightRawValue, PlantMeasurements measurement, Long experimentId,
+            String rawData) {
+        if (lightRawValue == null) {
+            logger.debug("No raw light value found");
+            return;
+        }
+
+        try {
+            double lightRaw = Double.parseDouble(lightRawValue);
+
+            ValidationResult validationResult = dataValidator.validateLightRaw(lightRaw);
+            if (validationResult != ValidationResult.VALIDATION_SUCCESS) {
+                logger.warn("Raw light validation failed: {}", validationResult);
+                storeInvalidMeasurement(experimentId,
+                        "LightRaw: " + lightRawValue,
+                        "Raw light validation failed: " + validationResult);
+                return;
+            }
+
+            measurement.setLysMængdeRaw(lightRaw);
+            logger.debug("Processed raw light value: {}", lightRaw);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid raw light format: {}", lightRawValue);
+            storeInvalidMeasurement(experimentId,
+                    "LightRaw: " + lightRawValue,
+                    "Invalid raw light format");
         }
     }
 
