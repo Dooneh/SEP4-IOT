@@ -26,6 +26,8 @@ public class DataValidator {
         VALIDATION_ERROR_LYS_LAVESTE_INTENSITET,
         VALIDATION_ERROR_LYS_INDSTILLING,
         VALIDATION_ERROR_LYS_GENNEMSNIT,
+        VALIDATION_ERROR_LYS_MÆNGDE,
+        VALIDATION_ERROR_LYS_MÆNGDE_RAW,
         VALIDATION_ERROR_AFSTAND_TIL_HØJDE,
         VALIDATION_ERROR_VAND_TID_FRA_SIDSTE,
         VALIDATION_ERROR_VAND_MÆNGDE,
@@ -92,6 +94,30 @@ public class DataValidator {
     public ValidationResult validateLightSetting(Integer lightSetting) {
         if (lightSetting != null && (lightSetting < 0 || lightSetting > 10)) {
             return ValidationResult.VALIDATION_ERROR_LYS_INDSTILLING;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateLightAmount(Double lightAmount) {
+        if (lightAmount == null) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE;
+        }
+
+        if (lightAmount < 0 || lightAmount > 100) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateLightRaw(Double lightRawAmount) {
+        if (lightRawAmount == null) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE_RAW;
+        }
+
+        if (lightRawAmount < 0) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE_RAW;
         }
 
         return ValidationResult.VALIDATION_SUCCESS;
@@ -349,6 +375,14 @@ public class DataValidator {
                         errorRow + 1);
             case VALIDATION_ERROR_LYS_GENNEMSNIT:
                 return String.format("Validation failed: Lys_gennemsnit validation error at row %d", errorRow + 1);
+            case VALIDATION_ERROR_LYS_MÆNGDE:
+                return String.format(
+                        "Validation failed: Lys_mængde must be a value between 0%% and 100%% at row %d",
+                        errorRow + 1);
+            case VALIDATION_ERROR_LYS_MÆNGDE_RAW:
+                return String.format(
+                        "Validation failed: Lys_mængde_raw must be a non-negative value at row %d",
+                        errorRow + 1);
             case VALIDATION_ERROR_AFSTAND_TIL_HØJDE:
                 return String.format("Validation failed: Afstand_til_Højde must be a positive integer at row %d",
                         errorRow + 1);

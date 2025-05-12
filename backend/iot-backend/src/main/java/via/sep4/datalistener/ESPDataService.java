@@ -257,9 +257,9 @@ public class ESPDataService {
 
             ValidationResult validationResult = dataValidator.validateLightAmount(lightPercentage);
             if (validationResult != ValidationResult.VALIDATION_SUCCESS) {
-                logger.warn("Light validation failed: {}", validationResult);
-                storeInvalidMeasurement(experimentId, "Light: " + lightValue,
-                        "Light validation failed: " + validationResult);
+                String errorMessage = dataValidator.getErrorMessage(validationResult);
+                logger.warn("Light validation failed: {}", errorMessage);
+                storeInvalidMeasurement(experimentId, "Light: " + lightValue, errorMessage);
                 return;
             }
 
