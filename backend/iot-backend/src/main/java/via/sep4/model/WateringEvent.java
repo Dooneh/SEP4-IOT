@@ -1,9 +1,14 @@
 package via.sep4.model;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 
 @Entity
+@Getter
+@Setter
 public class WateringEvent {
 
     @Id
@@ -14,6 +19,11 @@ public class WateringEvent {
 
     private Long experimentId;
 
+    private LocalDateTime startTime;
+
+    private LocalDateTime endTime;
+
+    private Integer durationSeconds;
 
     public WateringEvent(Long id, LocalDateTime timestamp, Long experimentId) {
         this.id = id;
@@ -27,13 +37,4 @@ public class WateringEvent {
         this.timestamp = timestamp;
         this.experimentId = experimentId;
     }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
-
-    public Long getExperimentId() { return experimentId; }
-    public void setExperimentId(Long experimentId) { this.experimentId = experimentId; }
 }

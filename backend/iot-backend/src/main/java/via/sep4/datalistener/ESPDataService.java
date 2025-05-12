@@ -16,6 +16,7 @@ import via.sep4.repository.PlantMeasurementsRepository;
 import via.sep4.service.ExperimentConfigService;
 import via.sep4.model.WateringEvent;
 import via.sep4.repository.WateringEventRepository;
+import via.sep4.service.WaterPump;
 
 
 import java.time.LocalDateTime;
