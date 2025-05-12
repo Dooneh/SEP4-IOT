@@ -36,5 +36,7 @@ public class PlantMeasurements {
     private double vandMængde;
     private double vandFrekvens;
 
+    private String motionSensor;
+
     private LocalDateTime timestamp;
 }
