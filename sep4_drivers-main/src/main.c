@@ -3,6 +3,7 @@
 #include "hc_sr04.h"
 #include "display.h"
 #include "dht11.h"
+#include "light.h"
 #include <util/delay.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +34,15 @@ void console_rx(uint8_t _rx)
     }
 }
 
+uint8_t convert_light_to_percent(uint16_t raw_value)
+{
+    uint8_t percentage = 100 - ((raw_value * 100) / 1023);
+    
+    if (percentage > 100) percentage = 100;
+    
+    return percentage;
+}
+
 int main()
 {
     char prompt_text[] = "Starting sensor measurements...\n";
@@ -42,6 +52,7 @@ int main()
     hc_sr04_init();
     display_init();
     dht11_init();
+    light_init();
 
     sei();
 
@@ -55,19 +66,22 @@ int main()
     while (1)
     {
         uint16_t distance = hc_sr04_takeMeasurement() / 58; // SKAL JUSTERES!
-        display_int(distance);                         
+        display_int(distance);
+        uint16_t light_raw = light_read();
+
+        uint8_t light_percent = convert_light_to_percent(light_raw);
 
         uint8_t hum_int = 0, hum_dec = 0, temp_int = 0, temp_dec = 0;
         DHT11_ERROR_MESSAGE_t dht_status = dht11_get(&hum_int, &hum_dec, &temp_int, &temp_dec);
 
         if (dht_status == DHT11_OK)
         {
-            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d %%\n",
-                    distance, temp_int, temp_dec, hum_int, hum_dec);
+            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u)\n",
+                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw);
         }
         else
         {
-            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!\n", distance);
+            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u)\n", distance, light_percent, light_raw);
         }
 
         wifi_command_TCP_transmit((uint8_t*)send_buffer, strlen(send_buffer));
