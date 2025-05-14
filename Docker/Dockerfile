@@ -12,6 +12,7 @@ COPY . /app/
 
 # Expose the port for the application
 EXPOSE 8080
+EXPOSE 24
 
 # Run the JAR file (make sure the path is correct)
 CMD ["java", "-jar", "/app/target/iot-1.0-SNAPSHOT.jar"]
