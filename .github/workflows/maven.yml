@@ -33,3 +33,28 @@ jobs:
 
     - name: Push Docker image
       run: docker push ${{ secrets.DOCKER_USERNAME }}/springboot-backend:latest
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+    - name: Delete existing container instance
+      run: az container delete --name springboot-backend --resource-group VIA-SEP4 --yes
+
+    - name: Recreate container instance with updated image
+      run: |
+        az container create \
+          --name springboot-backend \
+          --resource-group VIA-SEP4 \
+          --image ${{ secrets.DOCKER_USERNAME }}/springboot-backend:latest \
+          --cpu 1 \
+          --memory 1.5 \
+          --os-type Linux \
+          --ip-address Public \
+          --ports 23 \
+          --restart-policy Never
+
