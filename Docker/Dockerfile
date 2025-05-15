@@ -15,4 +15,5 @@ EXPOSE 8080
 EXPOSE 24
 
 # Run the JAR file (make sure the path is correct)
-CMD ["java", "-jar", "/app/target/iot-1.0-SNAPSHOT.jar"]
+CMD ["java", "-jar", "/app/backend/iot-backend/target/iot-1.0-SNAPSHOT.jar"]
+
