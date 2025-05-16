@@ -18,7 +18,6 @@ import via.sep4.model.WateringEvent;
 import via.sep4.repository.WateringEventRepository;
 import via.sep4.service.WaterPump;
 
-
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,11 +48,9 @@ public class ESPDataService {
 
     private LocalDateTime lastWateringTime;
 
-
     Pattern pumpPattern = Pattern.compile("Pump: (ON|OFF)");
 
     private final Pattern pattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
-
 
     public void processData(String data) {
         logger.info("Processing data: {}", data);
@@ -94,6 +91,9 @@ public class ESPDataService {
         processHumidity(extractedData.get("Humidity"), measurement, experimentId, data);
         processSoilMoisture(extractedData.get("Soil"), measurement, experimentId, data);
         processDistance(extractedData.get("Distance"), measurement, experimentId, data);
+        processLight(extractedData.get("Light"), measurement, experimentId, data);
+        processLightRaw(extractedData.get("LightRaw"), measurement, experimentId, data);
+        processMotion(extractedData.get("Motion"), measurement, experimentId, data);
 
         if (hasMeasurements(measurement)) {
             measurementsRepository.save(measurement);
@@ -105,13 +105,27 @@ public class ESPDataService {
 
     private Map<String, String> extractMeasurements(String data) {
         Map<String, String> extractedData = new HashMap<>();
-        Matcher matcher = pattern.matcher(data);
-
-        while (matcher.find()) {
-            String label = matcher.group(1);
-            String value = matcher.group(2);
+        Matcher numericMatcher = numericPattern.matcher(data);
+        while (numericMatcher.find()) {
+            String label = numericMatcher.group(1);
+            String value = numericMatcher.group(2);
             extractedData.put(label, value);
             logger.debug("Extracted {}: {}", label, value);
+        }
+
+        Matcher lightMatcher = lightPattern.matcher(data);
+        if (lightMatcher.find()) {
+            String lightPercentage = lightMatcher.group(1);
+            String lightRaw = lightMatcher.group(2);
+            extractedData.put("Light", lightPercentage);
+            extractedData.put("LightRaw", lightRaw);
+            logger.debug("Extracted Light: {}%, LightRaw: {}", lightPercentage, lightRaw);
+
+        Matcher motionMatcher = motionPattern.matcher(data);
+        if (motionMatcher.find()) {
+            String motionValue = motionMatcher.group(1);
+            extractedData.put("Motion", motionValue);
+            logger.debug("Extracted Motion: {}", motionValue);
         }
 
         return extractedData;
@@ -128,6 +142,7 @@ public class ESPDataService {
         measurement.setVandTidFraSidste(0);
         measurement.setVandMængde(0);
         measurement.setVandFrekvens(0);
+        measurement.setMotionSensor("No");
     }
 
     private boolean hasMeasurements(PlantMeasurements measurement) {
@@ -258,6 +273,88 @@ public class ESPDataService {
         }
     }
 
+    private void processMotion(String motionValue, PlantMeasurements measurement, Long experimentId,
+            String rawData) {
+        if (motionValue == null) {
+            logger.debug("No motion value found");
+            return;
+        }
+
+    private void processLight(String lightValue, PlantMeasurements measurement, Long experimentId,
+            String rawData) {
+        if (lightValue == null) {
+            logger.debug("No light value found");
+        try {
+            double lightPercentage = Double.parseDouble(lightValue);
+
+            ValidationResult validationResult = dataValidator.validateLightAmount(lightPercentage);
+            if (validationResult != ValidationResult.VALIDATION_SUCCESS) {
+                String errorMessage = dataValidator.getErrorMessage(validationResult);
+                logger.warn("Light validation failed: {}", errorMessage);
+                storeInvalidMeasurement(experimentId, "Light: " + lightValue, errorMessage);
+                return;
+            }
+
+            measurement.setLysMængde(lightPercentage);
+
+            logger.debug("Processed light value: {}%", lightPercentage);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid light format: {}", lightValue);
+            storeInvalidMeasurement(experimentId,
+                    "Light: " + lightValue,
+                    "Invalid light format");
+        }
+    }
+
+    private void processLightRaw(String lightRawValue, PlantMeasurements measurement, Long experimentId,
+            String rawData) {
+        if (lightRawValue == null) {
+            logger.debug("No raw light value found");
+            return;
+        }
+
+        try {
+            double lightRaw = Double.parseDouble(lightRawValue);
+
+            ValidationResult validationResult = dataValidator.validateLightRaw(lightRaw);
+            if (validationResult != ValidationResult.VALIDATION_SUCCESS) {
+                logger.warn("Raw light validation failed: {}", validationResult);
+                storeInvalidMeasurement(experimentId,
+                        "LightRaw: " + lightRawValue,
+                        "Raw light validation failed: " + validationResult);
+                return;
+            }
+
+            measurement.setLysMængdeRaw(lightRaw);
+            logger.debug("Processed raw light value: {}", lightRaw);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid raw light format: {}", lightRawValue);
+            storeInvalidMeasurement(experimentId,
+                    "LightRaw: " + lightRawValue,
+                    "Invalid raw light format");
+
+            String motion = motionValue.trim();
+            ValidationResult result = dataValidator.validateMotionSensor(motion);
+
+            if (result == ValidationResult.VALIDATION_SUCCESS) {
+                measurement.setMotionSensor(motion);
+                logger.debug("Valid motion: {}", motion);
+            } else {
+                String errorMessage = "Motion validation failed: " + dataValidator.getErrorMessage(result);
+                logger.warn(errorMessage);
+
+                storeInvalidMeasurement(experimentId,
+                        "Motion: " + motionValue,
+                        errorMessage);
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid motion format: {}", motionValue);
+            storeInvalidMeasurement(experimentId,
+                    "Motion: " + motionValue,
+                    "Invalid motion format");
+        }
+    }
+
     private void storeInvalidMeasurement(Long experimentId, String rawData, String errorMessage) {
         InvalidMeasurement invalidMeasurement = new InvalidMeasurement();
         invalidMeasurement.setExperimentId(experimentId);
@@ -269,84 +366,79 @@ public class ESPDataService {
         logger.info("Stored invalid measurement: {}", errorMessage);
     }
 
+    /**
+     * Process pump commands and manage watering events
+     *
+     * @param command ON or OFF command for the pump
+     */
+    private void processPumpCommand(String command) {
+        logger.info("Processing pump command: {}", command);
 
+        Long experimentId = experimentConfigService.getCurrentExperimentId();
+        Optional<PlantExperiment> experimentOptional = experimentConfigService.getCurrentExperiment();
 
-
-/**
- * Process pump commands and manage watering events
- *
- * @param command ON or OFF command for the pump
- */
-        private void processPumpCommand (String command){
-            logger.info("Processing pump command: {}", command);
-
-            Long experimentId = experimentConfigService.getCurrentExperimentId();
-            Optional<PlantExperiment> experimentOptional = experimentConfigService.getCurrentExperiment();
-
-            if (!experimentOptional.isPresent()) {
-                logger.error("No active experiment found with ID: {}", experimentId);
-                return;
-            }
-
-            PlantExperiment experiment = experimentOptional.get();
-
-            if ("ON".equals(command)) {
-                // Start the water pump
-                boolean success = waterPump.startWatering();
-
-                if (success) {
-                    // Record the watering event
-                    WateringEvent event = new WateringEvent();
-                    event.setExperiment(experiment);
-                    event.setStartTime(LocalDateTime.now());
-                    event.setEndTime(null); // Will be set when pump turns OFF
-
-                    // Calculate time since last watering if available
-                    if (lastWateringTime != null) {
-                        long minutesSinceLastWatering = ChronoUnit.MINUTES.between(lastWateringTime, LocalDateTime.now());
-                        event.setMinutesSinceLastWatering((int) minutesSinceLastWatering);
-                    }
-
-                    // Save the watering event
-                    WateringEvent savedEvent = wateringEventRepository.save(event);
-                    logger.info("Recorded watering start event with ID: {}", savedEvent.getId());
-                } else {
-                    logger.error("Failed to start water pump");
-                }
-            } else if ("OFF".equals(command)) {
-                // Stop the water pump
-                boolean success = waterPump.stopWatering();
-
-                if (success) {
-                    // Find the latest watering event without an end time
-                    List<WateringEvent> incompleteEvents = wateringEventRepository.findByExperimentIdAndEndTimeIsNull(experiment.getId());
-
-                    if (!incompleteEvents.isEmpty()) {
-                        // Update the most recent event with an end time
-                        WateringEvent latestEvent = incompleteEvents.get(0);
-                        latestEvent.setEndTime(LocalDateTime.now());
-
-                        // Calculate duration in seconds
-                        long durationSeconds = ChronoUnit.SECONDS.between(latestEvent.getStartTime(), latestEvent.getEndTime());
-                        latestEvent.setDurationSeconds((int) durationSeconds);
-
-                        // Update the event
-                        wateringEventRepository.save(latestEvent);
-                        logger.info("Updated watering event {} with end time and duration: {} seconds",
-                                latestEvent.getId(), durationSeconds);
-
-                        // Update the lastWateringTime for future reference
-                        lastWateringTime = LocalDateTime.now();
-                    } else {
-                        logger.warn("Received PUMP OFF command but no active watering event was found");
-                    }
-                } else {
-                    logger.error("Failed to stop water pump");
-                }
-            }
+        if (!experimentOptional.isPresent()) {
+            logger.error("No active experiment found with ID: {}", experimentId);
+            return;
         }
 
+        PlantExperiment experiment = experimentOptional.get();
 
+        if ("ON".equals(command)) {
+            // Start the water pump
+            boolean success = waterPump.startWatering();
+
+            if (success) {
+                // Record the watering event
+                WateringEvent event = new WateringEvent();
+                event.setExperiment(experiment);
+                event.setStartTime(LocalDateTime.now());
+                event.setEndTime(null); // Will be set when pump turns OFF
+
+                // Calculate time since last watering if available
+                if (lastWateringTime != null) {
+                    long minutesSinceLastWatering = ChronoUnit.MINUTES.between(lastWateringTime, LocalDateTime.now());
+                    event.setMinutesSinceLastWatering((int) minutesSinceLastWatering);
+                }
+
+                // Save the watering event
+                WateringEvent savedEvent = wateringEventRepository.save(event);
+                logger.info("Recorded watering start event with ID: {}", savedEvent.getId());
+            } else {
+                logger.error("Failed to start water pump");
+            }
+        } else if ("OFF".equals(command)) {
+            // Stop the water pump
+            boolean success = waterPump.stopWatering();
+
+            if (success) {
+                // Find the latest watering event without an end time
+                List<WateringEvent> incompleteEvents = wateringEventRepository
+                        .findByExperimentIdAndEndTimeIsNull(experiment.getId());
+
+                if (!incompleteEvents.isEmpty()) {
+                    // Update the most recent event with an end time
+                    WateringEvent latestEvent = incompleteEvents.get(0);
+                    latestEvent.setEndTime(LocalDateTime.now());
+
+                    // Calculate duration in seconds
+                    long durationSeconds = ChronoUnit.SECONDS.between(latestEvent.getStartTime(),
+                            latestEvent.getEndTime());
+                    latestEvent.setDurationSeconds((int) durationSeconds);
+
+                    // Update the event
+                    wateringEventRepository.save(latestEvent);
+                    logger.info("Updated watering event {} with end time and duration: {} seconds",
+                            latestEvent.getId(), durationSeconds);
+
+                    // Update the lastWateringTime for future reference
+                    lastWateringTime = LocalDateTime.now();
+                } else {
+                    logger.warn("Received PUMP OFF command but no active watering event was found");
+                }
+            } else {
+                logger.error("Failed to stop water pump");
+            }
+        }
     }
 }
-

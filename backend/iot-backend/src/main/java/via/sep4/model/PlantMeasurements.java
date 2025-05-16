@@ -30,11 +30,16 @@ public class PlantMeasurements {
     private double lysLavesteIntensitet;
     private double lysGennemsnit;
 
+    private double lysMængde;
+    private double lysMængdeRaw;
+
     private double afstandTilHøjde;
 
     private double vandTidFraSidste;
     private double vandMængde;
     private double vandFrekvens;
+
+    private String motionSensor;
 
     private LocalDateTime timestamp;
 }
