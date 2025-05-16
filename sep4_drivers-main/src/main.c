@@ -4,6 +4,7 @@
 #include "display.h"
 #include "dht11.h"
 #include "light.h"
+#include "pir.h"
 #include <util/delay.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +15,12 @@
 static uint8_t _buff[100];
 static uint8_t _index = 0;
 volatile static bool _done = false;
+volatile static bool motion_detected = false;
+
+void pir_motion_detected(void) {
+    motion_detected = true;
+    uart_send_string_blocking(USART_0, "Motion detected!\n");
+}
 
 void console_rx(uint8_t _rx)
 {
@@ -53,6 +60,7 @@ int main()
     display_init();
     dht11_init();
     light_init();
+    pir_init(pir_motion_detected);
 
     sei();
 
@@ -61,7 +69,7 @@ int main()
 
     uart_send_string_blocking(USART_0, prompt_text);
 
-    char send_buffer[128]; 
+    char send_buffer[128];
 
     while (1)
     {
@@ -76,16 +84,18 @@ int main()
 
         if (dht_status == DHT11_OK)
         {
-            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u)\n",
-                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw);
+            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s\n",
+                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw, motion_detected ? "Yes" : "No"));
         }
         else
         {
-            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u)\n", distance, light_percent, light_raw);
+            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s\n", distance, light_percent, light_raw, motion_detected ? "Yes" : "No");
         }
 
         wifi_command_TCP_transmit((uint8_t*)send_buffer, strlen(send_buffer));
         uart_send_string_blocking(USART_0, send_buffer);
+
+        motion_detected = false;
 
         _delay_ms(10000); 
     }
