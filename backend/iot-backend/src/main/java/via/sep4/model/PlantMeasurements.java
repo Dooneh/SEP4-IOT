@@ -30,6 +30,9 @@ public class PlantMeasurements {
     private double lysLavesteIntensitet;
     private double lysGennemsnit;
 
+    private double lysMængde;
+    private double lysMængdeRaw;
+
     private double afstandTilHøjde;
 
     private double vandTidFraSidste;
