@@ -5,12 +5,15 @@
 #include "dht11.h"
 #include "light.h"
 #include "pir.h"
+#include "water_pump.h"
 #include <util/delay.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <avr/interrupt.h>
 #include <stdio.h>
+
+static uint8_t timer_counter = 0;
 
 static uint8_t _buff[100];
 static uint8_t _index = 0;
@@ -38,6 +41,24 @@ void console_rx(uint8_t _rx)
         _index = 0;
         _done = true;
         uart_send_blocking(USART_0, '\n');
+        
+        if (strcmp((char*)_buff, "pump on") == 0) {
+            water_pump_start();
+            uart_send_string_blocking(USART_0, "Water pump started\n");
+        }
+        else if (strcmp((char*)_buff, "pump off") == 0) {
+            water_pump_stop();
+            uart_send_string_blocking(USART_0, "Water pump stopped\n");
+        }
+        else if (strncmp((char*)_buff, "pump run ", 9) == 0) {
+            uint16_t seconds = atoi((char*)_buff + 9);
+            if (seconds > 0) {
+                water_pump_run_for(seconds);
+                char response[40];
+                sprintf(response, "Water pump running for %u seconds\n", seconds);
+                uart_send_string_blocking(USART_0, response);
+            }
+        }
     }
 }
 
@@ -61,6 +82,7 @@ int main()
     dht11_init();
     light_init();
     pir_init(pir_motion_detected);
+    water_pump_init();
 
     sei();
 
@@ -68,8 +90,33 @@ int main()
     wifi_command_create_TCP_connection("IP", 23, NULL, NULL);
 
     uart_send_string_blocking(USART_0, prompt_text);
+    uart_send_string_blocking(USART_0, "Water pump control commands available:\n");
+    uart_send_string_blocking(USART_0, "  'pump on' - Start the water pump\n");
+    uart_send_string_blocking(USART_0, "  'pump off' - Stop the water pump\n");
+    uart_send_string_blocking(USART_0, "  'pump run X' - Run the pump for X seconds\n");
 
     char send_buffer[128];
+    bool pump_state = false;
+
+    while (1)
+    {
+        pump_state = !pump_state;
+        
+        if (pump_state) {
+            water_pump_start();
+            uart_send_string_blocking(USART_0, "Water pump: ON\n");
+        } else {
+            water_pump_stop();
+            uart_send_string_blocking(USART_0, "Water pump: OFF\n");
+        }
+        
+        display_int(pump_state ? 1 : 0);
+        
+        sprintf(send_buffer, "Water pump state: %s\n", pump_state ? "ON" : "OFF");
+        wifi_command_TCP_transmit((uint8_t*)send_buffer, strlen(send_buffer));
+        
+        _delay_ms(2000); // TODO: Skal ændres til at køre afhængig af soil humidity eller manuelt fra web interface
+    }
 
     while (1)
     {
@@ -84,12 +131,14 @@ int main()
 
         if (dht_status == DHT11_OK)
         {
-            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s\n",
-                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw, motion_detected ? "Yes" : "No"));
+            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s, Pump: %s\n",
+                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw, 
+                    motion_detected ? "Yes" : "No", water_pump_is_running() ? "ON" : "OFF");
         }
         else
         {
-            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s\n", distance, light_percent, light_raw, motion_detected ? "Yes" : "No");
+            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s, Pump: %s\n", 
+                    distance, light_percent, light_raw, motion_detected ? "Yes" : "No", water_pump_is_running() ? "ON" : "OFF");
         }
 
         wifi_command_TCP_transmit((uint8_t*)send_buffer, strlen(send_buffer));
@@ -97,7 +146,10 @@ int main()
 
         motion_detected = false;
 
-        _delay_ms(10000); 
+        for (timer_counter = 0; timer_counter < 10; timer_counter++) {
+            water_pump_update();
+            _delay_ms(1000);
+        }
     }
 
     return 0;
