@@ -1,15 +1,15 @@
 package via.sep4.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import via.sep4.types.TriggerType;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Getter
-@Setter
+@Data
+@NoArgsConstructor
 public class WaterPumpEvent {
 
     @Id
