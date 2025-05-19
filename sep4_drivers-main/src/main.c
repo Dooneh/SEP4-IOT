@@ -5,6 +5,7 @@
 #include "dht11.h"
 #include "light.h"
 #include "pir.h"
+#include "soil.h"
 #include <util/delay.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +62,7 @@ int main()
     dht11_init();
     light_init();
     pir_init(pir_motion_detected);
+    soil_init();
 
     sei();
 
@@ -76,20 +78,27 @@ int main()
         uint16_t distance = hc_sr04_takeMeasurement() / 58; // SKAL JUSTERES!
         display_int(distance);
         uint16_t light_raw = light_read();
+        uint16_t soil_adc = soil_read();
 
         uint8_t light_percent = convert_light_to_percent(light_raw);
+
+        float moisture_percent = (634-soil_adc)/(634/300);
+        
 
         uint8_t hum_int = 0, hum_dec = 0, temp_int = 0, temp_dec = 0;
         DHT11_ERROR_MESSAGE_t dht_status = dht11_get(&hum_int, &hum_dec, &temp_int, &temp_dec);
 
         if (dht_status == DHT11_OK)
         {
-            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s\n",
-                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw, motion_detected ? "Yes" : "No"));
-        }
-        else
-        {
-            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s\n", distance, light_percent, light_raw, motion_detected ? "Yes" : "No");
+            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s, Moisture: %d%%\n",
+                    distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw, motion_detected ? "Yes" : "No", soil_adc);
+
+                }
+                else
+                {
+            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s, Moisture: %d%%\n", 
+                    distance, light_percent, light_raw, motion_detected ? "Yes" : "No", soil_adc);
+            // sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s\n", distance, light_percent, light_raw, motion_detected ? "Yes" : "No", moisture_percent);
         }
 
         wifi_command_TCP_transmit((uint8_t*)send_buffer, strlen(send_buffer));
@@ -97,7 +106,7 @@ int main()
 
         motion_detected = false;
 
-        _delay_ms(10000); 
+        _delay_ms(50000); 
     }
 
     return 0;
