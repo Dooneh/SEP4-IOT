@@ -8,11 +8,14 @@ import org.springframework.stereotype.Service;
 import via.sep4.model.InvalidMeasurement;
 import via.sep4.model.PlantExperiment;
 import via.sep4.model.PlantMeasurements;
+// import via.sep4.model.WaterPumpEvent;
 import via.sep4.processing.DataValidator;
 import via.sep4.processing.DataValidator.ValidationResult;
 import via.sep4.repository.InvalidMeasurementRepository;
 import via.sep4.repository.PlantMeasurementsRepository;
+// import via.sep4.repository.WaterPumpEventRepository;
 import via.sep4.service.ExperimentConfigService;
+// import via.sep4.types.TriggerType;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -33,12 +36,18 @@ public class ESPDataService {
     @Autowired
     private InvalidMeasurementRepository invalidMeasurementRepository;
 
+    // @Autowired
+    // private WaterPumpEventRepository waterPumpEventRepository;
+
     @Autowired
     private ExperimentConfigService experimentConfigService;
+
+    // private WaterPumpEvent currentPumpEvent = null;
 
     private final Pattern numericPattern = Pattern.compile("(Distance|Temp|Humidity|Soil): (\\d+\\.?\\d*)");
     private final Pattern lightPattern = Pattern.compile("Light: (\\d+)% \\(raw: (\\d+)\\)");
     private final Pattern motionPattern = Pattern.compile("Motion: (\\w+)");
+    private final Pattern pumpPattern = Pattern.compile("Pump: (ON|OFF)");
 
     public void processData(String data) {
         logger.info("Processing data: {}", data);
@@ -74,7 +83,7 @@ public class ESPDataService {
         processLight(extractedData.get("Light"), measurement, experimentId, data);
         processLightRaw(extractedData.get("LightRaw"), measurement, experimentId, data);
         processMotion(extractedData.get("Motion"), measurement, experimentId, data);
-
+        // processWaterPump(extractedData.get("Pump"), experiment);
 
         if (hasMeasurements(measurement)) {
             measurementsRepository.save(measurement);
@@ -101,12 +110,20 @@ public class ESPDataService {
             extractedData.put("Light", lightPercentage);
             extractedData.put("LightRaw", lightRaw);
             logger.debug("Extracted Light: {}%, LightRaw: {}", lightPercentage, lightRaw);
+        }
 
         Matcher motionMatcher = motionPattern.matcher(data);
         if (motionMatcher.find()) {
             String motionValue = motionMatcher.group(1);
             extractedData.put("Motion", motionValue);
             logger.debug("Extracted Motion: {}", motionValue);
+        }
+
+        Matcher pumpMatcher = pumpPattern.matcher(data);
+        if (pumpMatcher.find()) {
+            String pumpStatus = pumpMatcher.group(1);
+            extractedData.put("Pump", pumpStatus);
+            logger.debug("Extracted Pump: {}", pumpStatus);
         }
 
         return extractedData;
@@ -261,10 +278,35 @@ public class ESPDataService {
             return;
         }
 
-      private void processLight(String lightValue, PlantMeasurements measurement, Long experimentId,
+        try {
+            String motion = motionValue.trim();
+            ValidationResult result = dataValidator.validateMotionSensor(motion);
+
+            if (result == ValidationResult.VALIDATION_SUCCESS) {
+                measurement.setMotionSensor(motion);
+                logger.debug("Valid motion: {}", motion);
+            } else {
+                String errorMessage = "Motion validation failed: " + dataValidator.getErrorMessage(result);
+                logger.warn(errorMessage);
+
+                storeInvalidMeasurement(experimentId,
+                        "Motion: " + motionValue,
+                        errorMessage);
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid motion format: {}", motionValue);
+            storeInvalidMeasurement(experimentId,
+                    "Motion: " + motionValue,
+                    "Invalid motion format");
+        }
+    }
+
+    private void processLight(String lightValue, PlantMeasurements measurement, Long experimentId,
             String rawData) {
         if (lightValue == null) {
             logger.debug("No light value found");
+        }
+
         try {
             double lightPercentage = Double.parseDouble(lightValue);
 
@@ -313,28 +355,40 @@ public class ESPDataService {
             storeInvalidMeasurement(experimentId,
                     "LightRaw: " + lightRawValue,
                     "Invalid raw light format");
-          
-            String motion = motionValue.trim();
-            ValidationResult result = dataValidator.validateMotionSensor(motion);
-
-            if (result == ValidationResult.VALIDATION_SUCCESS) {
-                measurement.setMotionSensor(motion);
-                logger.debug("Valid motion: {}", motion);
-            } else {
-                String errorMessage = "Motion validation failed: " + dataValidator.getErrorMessage(result);
-                logger.warn(errorMessage);
-
-                storeInvalidMeasurement(experimentId,
-                        "Motion: " + motionValue,
-                        errorMessage);
-            }
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid motion format: {}", motionValue);
-            storeInvalidMeasurement(experimentId,
-                    "Motion: " + motionValue,
-                    "Invalid motion format");
         }
     }
+
+    // private void processWaterPump(String pumpStatus, PlantExperiment experiment)
+    // {
+    // if (pumpStatus == null) {
+    // logger.debug("No pump status found");
+    // return;
+    // }
+
+    // boolean isRunning = "ON".equals(pumpStatus);
+
+    // if (isRunning && currentPumpEvent == null) {
+    // currentPumpEvent = new WaterPumpEvent();
+    // currentPumpEvent.setExperiment(experiment);
+    // currentPumpEvent.setStartTime(LocalDateTime.now());
+    // currentPumpEvent.setTriggerType(TriggerType.AUTOMATIC);
+    // logger.info("Water pump started at {}", currentPumpEvent.getStartTime());
+    // } else if (!isRunning && currentPumpEvent != null) {
+    // currentPumpEvent.setEndTime(LocalDateTime.now());
+
+    // double durationSeconds = java.time.Duration.between(
+    // currentPumpEvent.getStartTime(),
+    // currentPumpEvent.getEndTime()).toSeconds();
+
+    // currentPumpEvent.setDurationSeconds(durationSeconds);
+
+    // waterPumpEventRepository.save(currentPumpEvent);
+    // logger.info("Water pump stopped. Event saved with duration: {} seconds",
+    // durationSeconds);
+
+    // currentPumpEvent = null;
+    // }
+    // }
 
     private void storeInvalidMeasurement(Long experimentId, String rawData, String errorMessage) {
         InvalidMeasurement invalidMeasurement = new InvalidMeasurement();

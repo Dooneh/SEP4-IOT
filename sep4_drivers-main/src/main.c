@@ -82,7 +82,7 @@ int main()
 
         uint8_t light_percent = convert_light_to_percent(light_raw);
 
-        float moisture_percent = (634-soil_adc)/(634/300);
+        float soil_moisture_percent = (634-soil_adc)/(634/300);
         
 
         uint8_t hum_int = 0, hum_dec = 0, temp_int = 0, temp_dec = 0;
@@ -90,18 +90,18 @@ int main()
 
         if (dht_status == DHT11_OK)
         {
-            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s, Moisture: %d%%\n",
+            sprintf(send_buffer, "Distance: %u cm, Temp: %d.%d C, Humidity: %d.%d, Light: %u%% (raw: %u), Motion: %s, Soil: %d%%\n",
                     distance, temp_int, temp_dec, hum_int, hum_dec, light_percent, light_raw, motion_detected ? "Yes" : "No", soil_adc);
 
                 }
                 else
                 {
-            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s, Moisture: %d%%\n", 
+            sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s, Soil: %d%%\n", 
                     distance, light_percent, light_raw, motion_detected ? "Yes" : "No", soil_adc);
-            // sprintf(send_buffer, "Distance: %u cm, DHT11 sensor error!, Light: %u%% (raw: %u), Motion: %s\n", distance, light_percent, light_raw, motion_detected ? "Yes" : "No", moisture_percent);
         }
 
         wifi_command_TCP_transmit((uint8_t*)send_buffer, strlen(send_buffer));
+        
         uart_send_string_blocking(USART_0, send_buffer);
 
         motion_detected = false;
