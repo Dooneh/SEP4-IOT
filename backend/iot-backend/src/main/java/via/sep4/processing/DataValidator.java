@@ -26,10 +26,13 @@ public class DataValidator {
         VALIDATION_ERROR_LYS_LAVESTE_INTENSITET,
         VALIDATION_ERROR_LYS_INDSTILLING,
         VALIDATION_ERROR_LYS_GENNEMSNIT,
+        VALIDATION_ERROR_LYS_MÆNGDE,
+        VALIDATION_ERROR_LYS_MÆNGDE_RAW,
         VALIDATION_ERROR_AFSTAND_TIL_HØJDE,
         VALIDATION_ERROR_VAND_TID_FRA_SIDSTE,
         VALIDATION_ERROR_VAND_MÆNGDE,
         VALIDATION_ERROR_VAND_FREKVENS,
+        VALIDATION_ERROR_MOTION_SENSOR,
         VALIDATION_ERROR_TIDSSTEMPEL,
         VALIDATION_ERROR_GENERAL
     }
@@ -97,6 +100,30 @@ public class DataValidator {
         return ValidationResult.VALIDATION_SUCCESS;
     }
 
+    public ValidationResult validateLightAmount(Double lightAmount) {
+        if (lightAmount == null) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE;
+        }
+
+        if (lightAmount < 0 || lightAmount > 100) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateLightRaw(Double lightRawAmount) {
+        if (lightRawAmount == null) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE_RAW;
+        }
+
+        if (lightRawAmount < 0) {
+            return ValidationResult.VALIDATION_ERROR_LYS_MÆNGDE_RAW;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
     public ValidationResult validateHeight(Integer height) {
         if (height != null && height <= 0) {
             return ValidationResult.VALIDATION_ERROR_AFSTAND_TIL_HØJDE;
@@ -136,6 +163,18 @@ public class DataValidator {
 
         if (!isValidTimestamp(timestamp)) {
             return ValidationResult.VALIDATION_ERROR_TIDSSTEMPEL;
+        }
+
+        return ValidationResult.VALIDATION_SUCCESS;
+    }
+
+    public ValidationResult validateMotionSensor(String motionSensor) {
+        if (motionSensor == null || motionSensor.isEmpty()) {
+            return ValidationResult.VALIDATION_ERROR_MOTION_SENSOR;
+        }
+
+        if (!motionSensor.equals("Yes") && !motionSensor.equals("No")) {
+            return ValidationResult.VALIDATION_ERROR_MOTION_SENSOR;
         }
 
         return ValidationResult.VALIDATION_SUCCESS;
@@ -193,6 +232,11 @@ public class DataValidator {
             errors.add(getErrorMessage(waterFreqResult));
         }
 
+        ValidationResult motionSensorResult = validateMotionSensor(data.get("Motion_sensor"));
+        if (motionSensorResult != ValidationResult.VALIDATION_SUCCESS) {
+            errors.add(getErrorMessage(motionSensorResult));
+        }
+
         ValidationResult timestampResult = validateTimestamp(data.get("Tidsstempel"));
         if (timestampResult != ValidationResult.VALIDATION_SUCCESS) {
             errors.add(getErrorMessage(timestampResult));
@@ -226,6 +270,7 @@ public class DataValidator {
         int vandTidFraSidsteIdx = findColumnIndex(converter, "Vand_tid_fra_sidste");
         int vandMængdeIdx = findColumnIndex(converter, "Vand_mængde");
         int vandFrekvensIdx = findColumnIndex(converter, "Vand_frekvens");
+        int motionSensorIdx = findColumnIndex(converter, "Motion_sensor");
         int tidsstempelIdx = findColumnIndex(converter, "Tidsstempel");
 
         if (luftTempIdx == -1 || luftfugtighedIdx == -1 || jordFugtighedIdx == -1) {
@@ -308,6 +353,14 @@ public class DataValidator {
                 }
             }
 
+            if (motionSensorIdx != -1) {
+                String motionSensorValue = rowData.get(converter.getHeaders().get(motionSensorIdx));
+                ValidationResult motionSensorResult = validateMotionSensor(motionSensorValue);
+                if (motionSensorResult != ValidationResult.VALIDATION_SUCCESS) {
+                    return motionSensorResult;
+                }
+            }
+
             if (tidsstempelIdx != -1) {
                 String timestampValue = rowData.get(converter.getHeaders().get(tidsstempelIdx));
                 ValidationResult timestampResult = validateTimestamp(timestampValue);
@@ -349,6 +402,14 @@ public class DataValidator {
                         errorRow + 1);
             case VALIDATION_ERROR_LYS_GENNEMSNIT:
                 return String.format("Validation failed: Lys_gennemsnit validation error at row %d", errorRow + 1);
+            case VALIDATION_ERROR_LYS_MÆNGDE:
+                return String.format(
+                        "Validation failed: Lys_mængde must be a value between 0%% and 100%% at row %d",
+                        errorRow + 1);
+            case VALIDATION_ERROR_LYS_MÆNGDE_RAW:
+                return String.format(
+                        "Validation failed: Lys_mængde_raw must be a non-negative value at row %d",
+                        errorRow + 1);
             case VALIDATION_ERROR_AFSTAND_TIL_HØJDE:
                 return String.format("Validation failed: Afstand_til_Højde must be a positive integer at row %d",
                         errorRow + 1);
@@ -360,6 +421,10 @@ public class DataValidator {
                         errorRow + 1);
             case VALIDATION_ERROR_VAND_FREKVENS:
                 return String.format("Validation failed: Vand_frekvens must be a positive integer at row %d",
+                        errorRow + 1);
+            case VALIDATION_ERROR_MOTION_SENSOR:
+                return String.format(
+                        "Validation failed: Motion_sensor must be a non-empty string at row %d containing either 'Yes' or 'No'",
                         errorRow + 1);
             case VALIDATION_ERROR_TIDSSTEMPEL:
                 return String.format("Validation failed: Tidsstempel must be in YYYY-MM-DDThh:mm:ss format at row %d",
@@ -392,6 +457,7 @@ public class DataValidator {
         int vandTidFraSidsteIdx = findColumnIndex(converter, "Vand_tid_fra_sidste");
         int vandMængdeIdx = findColumnIndex(converter, "Vand_mængde");
         int vandFrekvensIdx = findColumnIndex(converter, "Vand_frekvens");
+        int motionSensorIdx = findColumnIndex(converter, "Motion_sensor");
         int tidsstempelIdx = findColumnIndex(converter, "Tidsstempel");
 
         if (luftTempIdx == -1) {
@@ -521,6 +587,16 @@ public class DataValidator {
                 } else if (vandFrekvensValue <= 0) {
                     validationErrors.add(String.format("Row %d: Water frequency must be a positive number (got: %s)",
                             row + 1, vandFrekvensValue));
+                }
+            }
+
+            if (motionSensorIdx != -1) {
+                String motionSensorValue = rowData.get(converter.getHeaders().get(motionSensorIdx));
+                if (motionSensorValue == null || motionSensorValue.isEmpty()) {
+                    validationErrors.add(String.format("Row %d: Motion sensor value is missing or empty", row + 1));
+                } else if (!motionSensorValue.equalsIgnoreCase("Yes") && !motionSensorValue.equalsIgnoreCase("No")) {
+                    validationErrors.add(String.format(
+                            "Row %d: Motion sensor value must be 'Yes' or 'No' (got: %s)", row + 1, motionSensorValue));
                 }
             }
 
