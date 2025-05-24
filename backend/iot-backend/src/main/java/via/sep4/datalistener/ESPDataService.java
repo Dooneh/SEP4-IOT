@@ -75,7 +75,6 @@ public class ESPDataService {
         processLightRaw(extractedData.get("LightRaw"), measurement, experimentId, data);
         processMotion(extractedData.get("Motion"), measurement, experimentId, data);
 
-
         if (hasMeasurements(measurement)) {
             measurementsRepository.save(measurement);
             logger.info("Saved measurement with valid data points for experiment ID: {}", experimentId);
@@ -101,6 +100,7 @@ public class ESPDataService {
             extractedData.put("Light", lightPercentage);
             extractedData.put("LightRaw", lightRaw);
             logger.debug("Extracted Light: {}%, LightRaw: {}", lightPercentage, lightRaw);
+        }
 
         Matcher motionMatcher = motionPattern.matcher(data);
         if (motionMatcher.find()) {
@@ -261,10 +261,35 @@ public class ESPDataService {
             return;
         }
 
-      private void processLight(String lightValue, PlantMeasurements measurement, Long experimentId,
+        try {
+            String motion = motionValue.trim();
+            ValidationResult result = dataValidator.validateMotionSensor(motion);
+
+            if (result == ValidationResult.VALIDATION_SUCCESS) {
+                measurement.setMotionSensor(motion);
+                logger.debug("Valid motion: {}", motion);
+            } else {
+                String errorMessage = "Motion validation failed: " + dataValidator.getErrorMessage(result);
+                logger.warn(errorMessage);
+
+                storeInvalidMeasurement(experimentId,
+                        "Motion: " + motionValue,
+                        errorMessage);
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid motion format: {}", motionValue);
+            storeInvalidMeasurement(experimentId,
+                    "Motion: " + motionValue,
+                    "Invalid motion format");
+        }
+    }
+
+    private void processLight(String lightValue, PlantMeasurements measurement, Long experimentId,
             String rawData) {
         if (lightValue == null) {
             logger.debug("No light value found");
+        }
+
         try {
             double lightPercentage = Double.parseDouble(lightValue);
 
@@ -313,26 +338,6 @@ public class ESPDataService {
             storeInvalidMeasurement(experimentId,
                     "LightRaw: " + lightRawValue,
                     "Invalid raw light format");
-          
-            String motion = motionValue.trim();
-            ValidationResult result = dataValidator.validateMotionSensor(motion);
-
-            if (result == ValidationResult.VALIDATION_SUCCESS) {
-                measurement.setMotionSensor(motion);
-                logger.debug("Valid motion: {}", motion);
-            } else {
-                String errorMessage = "Motion validation failed: " + dataValidator.getErrorMessage(result);
-                logger.warn(errorMessage);
-
-                storeInvalidMeasurement(experimentId,
-                        "Motion: " + motionValue,
-                        errorMessage);
-            }
-        } catch (NumberFormatException e) {
-            logger.warn("Invalid motion format: {}", motionValue);
-            storeInvalidMeasurement(experimentId,
-                    "Motion: " + motionValue,
-                    "Invalid motion format");
         }
     }
 
